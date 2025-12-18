@@ -5,7 +5,7 @@ pipeline {
         choice(
             name: 'ACTION',
             choices: ['apply', 'destroy'],
-            description: 'Choose apply to create infra or destroy to delete infra'
+            description: 'apply = create infra, destroy = delete infra'
         )
     }
 
@@ -36,9 +36,11 @@ pipeline {
                 dir('terraform') {
                     sh '''
                     if [ "$ACTION" = "destroy" ]; then
+                        echo "Destroying infrastructure..."
                         terraform destroy -auto-approve
                         exit 0
                     else
+                        echo "Applying infrastructure..."
                         terraform apply -auto-approve
                     fi
                     '''
@@ -53,9 +55,11 @@ pipeline {
             steps {
                 dir('ansible') {
                     sh '''
+                    echo "Inventory check:"
                     ansible-inventory -i inventory/aws_ec2.yaml --graph
 
-                    ansible all \
+                    echo "Waiting for SSH using Ansible (no nc required)..."
+                    ansible env_dev \
                       -i inventory/aws_ec2.yaml \
                       -u ubuntu \
                       --private-key=$SSH_KEY \
@@ -73,8 +77,10 @@ pipeline {
             steps {
                 dir('ansible') {
                     sh '''
+                    echo "Running Ansible playbook on env_dev only"
                     ansible-playbook \
                       -i inventory/aws_ec2.yaml \
+                      -l env_dev \
                       -u ubuntu \
                       --private-key=$SSH_KEY \
                       playbooks/site.yaml
