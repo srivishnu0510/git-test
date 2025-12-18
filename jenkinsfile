@@ -35,30 +35,34 @@ pipeline {
             steps {
                 dir('terraform') {
                     sh '''
-                    if [ "$ACTION" = "apply" ]; then
-                        terraform apply -auto-approve
-                    else
+                    if [ "$ACTION" = "destroy" ]; then
                         terraform destroy -auto-approve
+                        exit 0
+                    else
+                        terraform apply -auto-approve
                     fi
                     '''
                 }
             }
         }
 
-        stage('Wait for SSH') {
+        stage('Wait for EC2 SSH (Ansible Native)') {
             when {
                 expression { params.ACTION == 'apply' }
             }
             steps {
-                sh '''
-                echo "Waiting for EC2 SSH to be ready..."
-                for i in {1..15}; do
-                    nc -z 172.31.1.111 22 && echo "SSH is ready" && exit 0
-                    sleep 10
-                done
-                echo "ERROR: SSH not available"
-                exit 1
-                '''
+                dir('ansible') {
+                    sh '''
+                    ansible-inventory -i inventory/aws_ec2.yaml --graph
+
+                    ansible all \
+                      -i inventory/aws_ec2.yaml \
+                      -u ubuntu \
+                      --private-key=$SSH_KEY \
+                      -m wait_for_connection \
+                      -a "timeout=300"
+                    '''
+                }
             }
         }
 
@@ -69,13 +73,6 @@ pipeline {
             steps {
                 dir('ansible') {
                     sh '''
-                    echo "Using Ansible config:"
-                    ansible --version
-
-                    echo "Inventory graph:"
-                    ansible-inventory -i inventory/aws_ec2.yaml --graph
-
-                    echo "Running Ansible playbook"
                     ansible-playbook \
                       -i inventory/aws_ec2.yaml \
                       -u ubuntu \
