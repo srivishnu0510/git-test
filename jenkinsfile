@@ -41,7 +41,7 @@ pipeline {
             }
         }
 
-        stage('Run Ansible Playbook (env_dev only)') {
+        stage('Run Ansible Playbook (env_dev ONLY)') {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh '''
